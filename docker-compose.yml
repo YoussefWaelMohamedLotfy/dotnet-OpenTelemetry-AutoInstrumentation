@@ -1,0 +1,72 @@
+# Launch command: docker-compose up
+name: counter-app
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    container_name: otel-collector
+    volumes:
+      - ./config/collector.yml:/etc/otel/config.yaml
+    command: --config /etc/otel/config.yaml
+    depends_on:
+      - jaeger
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - 16686:16686 # Jaeger UI
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090 # Prometheus UI
+
+  redis:
+    image: redis
+    container_name: redis
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - 6379:6379
+
+  monotonic-counter:
+    image: monotonic-counter
+    container_name: monotonic-counter
+    depends_on:
+      - counter-store
+      - redis
+    build:
+      context: .
+      dockerfile: MonotonicCounter/Dockerfile
+    env_file:
+      - .env
+    environment:
+      CounterStoreServiceHostName: counter-store
+      OTEL_SERVICE_NAME: monotonic-counter
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,service.version=1.0.0.0
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_DOTNET_AUTO_METRICS_ADDITIONAL_SOURCES: "Examples.MonotonicCounter"
+    ports:
+      - 8080:8080
+
+  counter-store:
+    image: counter-store
+    container_name: counter-store
+    depends_on:
+      - redis
+    build:
+      context: .
+      dockerfile: CounterStore/Dockerfile
+    env_file:
+      - .env
+    environment:
+      RedisHost: redis
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: counter-store
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,service.version=1.0.0.0
