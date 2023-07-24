@@ -14,6 +14,7 @@ app.UseSwagger().UseSwaggerUI();
 var meter = new Meter("Examples.MonotonicCounter", "1.0.0");
 var incrementRequests = meter.CreateCounter<int>("srv.increment-request.count", "requests", "Number of increment operations");
 var getRequests = meter.CreateCounter<int>("srv.get-request.count", "requests", "Number of get operations");
+var serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
 app.MapPost("/increment/{counter}/{delta}", async (string counter, long delta, CounterStoreClient client, ILogger<Program> logger) =>
     {
@@ -21,7 +22,7 @@ app.MapPost("/increment/{counter}/{delta}", async (string counter, long delta, C
         incrementRequests.Add(1);
         var response = await client.Client.PostAsync($"/increment/{counter}/{delta}", null);
         response.EnsureSuccessStatusCode();
-        return JsonSerializer.Deserialize<StoreResponse>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return JsonSerializer.Deserialize<StoreResponse>(await response.Content.ReadAsStringAsync(), serializerOptions);
     })
     .WithName("IncrementCounter")
     .WithOpenApi();

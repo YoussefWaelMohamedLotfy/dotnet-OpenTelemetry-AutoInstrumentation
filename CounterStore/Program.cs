@@ -13,6 +13,7 @@ app.MapGet("/{counter}", async (string counter) =>
     var value = await redis.StringGetAsync(counter.ToLowerInvariant());
     return new CounterStateResponse(counter.ToLowerInvariant(), value.TryParse(out int count) ? count : 0);
 });
+
 app.MapPost("increment/{counter}/{delta}", async (string counter, int delta) =>
 {
     // Throws exception if delta is less than 0
